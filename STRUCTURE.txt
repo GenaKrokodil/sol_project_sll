@@ -1,0 +1,58 @@
+СТРУКТУРА ПРОЕКТА (торговая система, v1)
+=========================================
+
+Порядок запуска:
+    1. python3 data_collector.py     # собрать свечи с биржи
+    2. python3 strategy_backtest.py  # прогнать стратегию на собранных свечах
+
+Файлы проекта:
+--------------
+
+config.json            — НАСТРОЙКИ (создаётся/правится вручную, читается обеими программами)
+    symbol                 — инструмент фьючерса (SOLUSDT)
+    timeframe_minutes      — таймфрейм свечей (5)
+    strategy.fast_period   — длина быстрой средней кривой (5)
+    strategy.slow_period   — длина медленной средней кривой (13)
+    backtest.initial_balance — стартовый баланс теста
+    backtest.fee_rate      — комиссия за сделку (в долю, с каждой стороны)
+
+data_collector.py      — ФАЙЛ 1: СБОРЩИК ДАННЫХ
+    Вход : config.json
+    Выход: candles.csv, дописывает logs.txt
+    Логика: качает 5m свечи SOLUSDT-фьючерса с биржи Bibit
+            (OHLC, объём, время открытия/закрытия), пишет построчно
+            от самой старой свечи к новой, первая строка — заголовок.
+
+candles.csv            — ДАННЫЕ (создаёт data_collector.py, читает strategy_backtest.py)
+    Колонки: open_time, close_time, open, high, low, close, volume
+    Время — unix seconds. Строки упорядочены: сверху старая свеча.
+
+strategy_backtest.py   — ФАЙЛ 2: СТРАТЕГИЯ + ТЕСТЕР
+    Вход : config.json, candles.csv
+    Выход: backtest_result.json, trade_history.txt, дописывает logs.txt
+    Логика: MA(5) пересекает MA(13) -> вход; обратное пересечение ->
+            сделка переворачивается (лонг<->шорт); в конце периода
+            открытая сделка принудительно закрывается по последней цене.
+
+backtest_result.json   — РЕЗУЛЬТАТ ТЕСТА (создаёт strategy_backtest.py)
+    initial_balance, final_balance, total_pnl, return_percent,
+    trades_count, wins, losses, win_rate_percent, forced_close_at_end
+
+trade_history.txt      — ИСТОРИЯ СДЕЛОК + СОСТОЯНИЕ СЧЁТА (создаёт strategy_backtest.py)
+    Строка START BALANCE, далее по каждой сделке:
+    направление, цена/время входа, цена/время выхода, pnl, баланс после сделки.
+
+logs.txt               — ОБЩИЙ ЛОГ ВСЕЙ ПРОГРАММЫ (пишут оба файла, режим append)
+    Формат строки: [дата время] [имя модуля] сообщение
+    Теги: [collector], [backtest]
+
+Обмен данными между файлами (строгий контракт):
+-------------------------------------------------
+    config.json  -->  data_collector.py    (symbol, timeframe_minutes)
+    config.json  -->  strategy_backtest.py (strategy.*, backtest.*)
+    data_collector.py --> candles.csv --> strategy_backtest.py
+    strategy_backtest.py --> backtest_result.json + trade_history.txt
+    оба модуля --> logs.txt
+
+Новые модули должны читать только config.json и candles.csv и писать
+только в свои выходные файлы; прямых импортов между скриптами нет.

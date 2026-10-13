@@ -1,0 +1,13 @@
+{
+    "symbol": "SOLUSDT",
+    "timeframe_minutes": 5,
+    "strategy": {
+        "fast_period": 5,
+        "slow_period": 13
+    },
+    "backtest": {
+        "initial_balance": 1000.0,
+        "fee_rate": 0.0005,
+        "position_size": 1.0
+    }
+}
