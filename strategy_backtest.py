@@ -22,6 +22,7 @@ HISTORY_PATH = "trade_history.txt"
 LOG_PATH = "logs.txt"
 
 # Записывает строку события в общий файл логов программы (тег [backtest]).
+# Лог НЕ очищается: очистку выполняет только collector при своём запуске, здесь — дозапись.
 def log(message):
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_PATH, "a", encoding="utf-8") as f:

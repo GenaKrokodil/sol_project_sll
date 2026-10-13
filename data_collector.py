@@ -19,9 +19,17 @@ import requests
 CONFIG_PATH = "config.json"
 OUTPUT_PATH = "candles.csv"
 LOG_PATH = "logs.txt"
-API_URL = "https://www.bibit.com/api/v3/market/kline"
+API_HOSTS = ["https://api.bibit.com", "https://www.bibit.com"]  # зеркальный хост API, затем сайт
+REQUEST_TIMEOUT_SEC = 15
+MAX_RETRIES = 3
 
-# Записывает строку события в общий файл логов программы.
+# Полностью перезаписывает logs.txt первой строкой запуска (при каждом запуске лог очищается).
+def reset_log():
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_PATH, "w", encoding="utf-8") as f:
+        f.write(f"[{stamp}] [collector] LOG RESET (new run)\n")
+
+# Записывает строку события в общий файл логов программы (дозапись внутри текущего запуска).
 def log(message):
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_PATH, "a", encoding="utf-8") as f:
@@ -40,24 +48,34 @@ def load_config():
 # Блок: загрузка свечей с биржи
 # ============================================================
 
-# Запрашивает у биржи одну страницу свечей; возвращает список строк или None при сбое.
+# Запрашивает у биржи одну страницу свечей: перебор хостов + ретраи; возвращает список строк или None при полном сбое.
 def fetch_page(symbol, interval, start_time, limit):
     params = {"symbol": symbol, "interval": interval,
               "startTime": start_time, "limit": limit}
-    try:
-        resp = requests.get(API_URL, params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("data") or data.get("result") or []
-    except (requests.RequestException, ValueError) as e:
-        log(f"ERROR request failed: {e}")
-        return None
+    for host in API_HOSTS:
+        url = f"{host}/api/v3/market/kline"
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SEC)
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("data") or data.get("result") or []
+            except (requests.RequestException, ValueError) as e:
+                log(f"ERROR request failed host={host} attempt={attempt}/{MAX_RETRIES}: {e}")
+                time.sleep(1)
+    return None
 
 # Нормализует сырую свечу биржи в кортеж (open_time, close_time, o, h, l, c, volume).
+# Формат списка: [openTime, closeTime, open, high, low, close, volume, ...] — как в API Bibit.
 def parse_candle(raw):
-    open_time = int(raw[0]) // 1000 if isinstance(raw[0], (int, float)) else int(raw["openTime"]) // 1000
-    close_time = int(raw[6]) // 1000 if isinstance(raw, list) else int(raw["closeTime"]) // 1000
-    values = raw[1:6] if isinstance(raw, list) else [raw["open"], raw["high"], raw["low"], raw["close"], raw["volume"]]
+    if isinstance(raw, list):
+        open_time = int(raw[0]) // 1000
+        close_time = int(raw[1]) // 1000
+        values = raw[2:7]
+    else:
+        open_time = int(raw["openTime"]) // 1000
+        close_time = int(raw["closeTime"]) // 1000
+        values = [raw["open"], raw["high"], raw["low"], raw["close"], raw["volume"]]
     return (open_time, close_time, *(float(v) for v in values))
 
 # Собирает полный массив свечей постранично; возвращает отсортированный по времени список.
@@ -77,7 +95,7 @@ def collect_candles(symbol, interval_minutes, total):
         for raw in page:
             candle = parse_candle(raw)
             candles[candle[0]] = candle
-        last_open = max(c[0] for c in candles) if candles else cursor
+        last_open = max(candles.keys()) if candles else cursor
         next_cursor = last_open + interval_sec
         if next_cursor <= cursor:
             break
@@ -90,15 +108,20 @@ def collect_candles(symbol, interval_minutes, total):
 # ============================================================
 
 # Пишет свечи в candles.csv: первая строка — заголовок, далее свечи от старой к новой.
+# Пустой результат НЕ перезаписывает: старый файл сохраняется (защита от сбоя биржи).
 def save_candles(candles):
+    if not candles:
+        log(f"WARNING no data: {OUTPUT_PATH} left unchanged")
+        return
     header = ["open_time", "close_time", "open", "high", "low", "close", "volume"]
     with open(OUTPUT_PATH, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(candles)
 
-# Точка входа: конфиг -> сбор -> сохранение -> итог в лог.
+# Точка входа: очистка лога -> конфиг -> сбор -> сохранение -> итог в лог.
 def main():
+    reset_log()
     config = load_config()
     symbol = config["symbol"]
     interval = int(config["timeframe_minutes"])
