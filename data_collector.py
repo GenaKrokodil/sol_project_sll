@@ -59,7 +59,12 @@ def fetch_page(symbol, interval, start_time, limit):
                 resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SEC)
                 resp.raise_for_status()
                 data = resp.json()
-                return data.get("data") or data.get("result") or []
+                if isinstance(data, dict):
+                    payload = data.get("data") or data.get("result") or []
+                    if isinstance(payload, dict):  # формат {"data": {"klines": [...]}}
+                        payload = payload.get("klines") or []
+                    return payload
+                return data if isinstance(data, list) else None
             except (requests.RequestException, ValueError) as e:
                 log(f"ERROR request failed host={host} attempt={attempt}/{MAX_RETRIES}: {e}")
                 time.sleep(1)
