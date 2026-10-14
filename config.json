@@ -1,6 +1,7 @@
 {
     "symbol": "SOLUSDT",
     "timeframe_minutes": 5,
+    "candles_count": 1000,
     "strategy": {
         "fast_period": 5,
         "slow_period": 13

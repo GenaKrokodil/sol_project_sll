@@ -1,0 +1,14 @@
+[2026-10-14 16:20:24] [collector] LOG RESET (new run)
+[2026-10-14 16:20:24] [collector] START collection symbol=SOLUSDT timeframe=5m total=1000
+[2026-10-14 16:20:24] [collector] DONE saved 1000 candles to candles.csv
+[2026-10-14 16:20:24] [pipeline] OK data_collector.py finished (exit 0)
+[2026-10-14 16:20:24] [pipeline] CHECK candles OK: 1000 rows, ordered old->new
+[2026-10-14 16:20:24] [pipeline] STAGE 'collect' PASSED
+[2026-10-14 16:20:24] [pipeline] RUN strategy_backtest.py
+[2026-10-14 16:20:24] [backtest] START backtest candles=1000 ma=(5,13) balance=1000.0
+[2026-10-14 16:20:24] [backtest] DONE trades=83 final_balance=998.8763 return=-0.1124% history saved to trade_history.txt
+[2026-10-14 16:20:24] [pipeline] OK strategy_backtest.py finished (exit 0)
+[2026-10-14 16:20:24] [pipeline] CHECK result OK: trades=83, balance=998.8763
+[2026-10-14 16:20:24] [pipeline] CHECK trade history OK
+[2026-10-14 16:20:24] [pipeline] STAGE 'backtest' PASSED
+[2026-10-14 16:20:24] [pipeline] DONE pipeline completed, all stages passed
