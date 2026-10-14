@@ -1,0 +1,11 @@
+{
+    "initial_balance": 1000.0,
+    "final_balance": 998.8763,
+    "total_pnl": -1.1237,
+    "return_percent": -0.1124,
+    "trades_count": 83,
+    "wins": 22,
+    "losses": 61,
+    "win_rate_percent": 26.51,
+    "forced_close_at_end": true
+}
